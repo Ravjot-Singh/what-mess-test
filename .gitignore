@@ -1,0 +1,11 @@
+node_modules/
+npm-debug.log*
+
+# Real credentials. Never commit. On Vercel, set these as Environment Variables
+# in the project settings instead.
+.env
+.env.local
+.env*.local
+
+# Vercel CLI local state
+.vercel

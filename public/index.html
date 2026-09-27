@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WhatsApp Sender</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --border: #e2e5ea;
+        --text: #1a1d21;
+        --muted: #646b75;
+        --accent: #1a7f52;
+        --accent-hover: #166844;
+        --accent-text: #ffffff;
+        --danger: #b3341f;
+        --danger-bg: #fdf2f0;
+        --ok: #1a7f52;
+        --ok-bg: #f0f9f4;
+        --warn: #8a5a00;
+        --warn-bg: #fdf8ec;
+        --radius: 12px;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #14171c;
+          --card: #1c2027;
+          --border: #2e343d;
+          --text: #e6e9ef;
+          --muted: #9aa2ad;
+          --accent: #2f9e68;
+          --accent-hover: #38b578;
+          --accent-text: #08130d;
+          --danger: #f0836c;
+          --danger-bg: #2a1a17;
+          --ok: #5fc38d;
+          --ok-bg: #16241d;
+          --warn: #e0b055;
+          --warn-bg: #261f12;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      main {
+        width: 100%;
+        max-width: 440px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 32px 28px;
+        text-align: center;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+      }
+
+      .sub {
+        margin: 0 0 26px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      button {
+        width: 100%;
+        font: inherit;
+        font-size: 16px;
+        font-weight: 600;
+        padding: 14px 20px;
+        border-radius: 10px;
+        border: none;
+        background: var(--accent);
+        color: var(--accent-text);
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      button:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      #result {
+        margin-top: 22px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        font-size: 14px;
+        text-align: left;
+        display: none;
+      }
+      #result.show {
+        display: block;
+      }
+      #result.ok {
+        background: var(--ok-bg);
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+      #result.err {
+        background: var(--danger-bg);
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      #result.warn {
+        background: var(--warn-bg);
+        border-color: var(--warn);
+        color: var(--warn);
+      }
+      #result strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 15px;
+      }
+      #result dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 4px 12px;
+        margin: 8px 0 0;
+        font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+        font-size: 13px;
+      }
+      #result dt {
+        opacity: 0.75;
+      }
+      #result dd {
+        margin: 0;
+      }
+      #result .note {
+        margin-top: 8px;
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div class="card">
+        <h1>WhatsApp Sender</h1>
+        <p class="sub">Sends a pre-approved WhatsApp template via the Twilio API.</p>
+
+        <button id="send">Send WhatsApp message</button>
+
+        <div id="result"></div>
+      </div>
+    </main>
+
+    <script>
+      const btn = document.getElementById('send');
+      const out = document.getElementById('result');
+
+      function render(kind, title, rows, note) {
+        out.className = `show ${kind}`;
+        let html = `<strong>${title}</strong>`;
+        const entries = Object.entries(rows || {}).filter(([, v]) => v !== null && v !== undefined);
+        if (entries.length) {
+          html += '<dl>';
+          for (const [k, v] of entries) html += `<dt>${k}</dt><dd>${escape(String(v))}</dd>`;
+          html += '</dl>';
+        }
+        if (note) html += `<div class="note">${escape(note)}</div>`;
+        out.innerHTML = html;
+      }
+
+      function escape(s) {
+        return s.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+      }
+
+      btn.addEventListener('click', async () => {
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Sending…';
+        out.className = '';
+
+        try {
+          // The server holds every parameter; there is nothing to send up.
+          const res = await fetch('/api/send', { method: 'POST' });
+          const data = await res.json();
+
+          if (data.ok) {
+            render(
+              'ok',
+              'Message sent',
+              { status: data.status, sent: data.dateCreated },
+              'Twilio accepted the message. Delivery normally takes a few seconds.'
+            );
+          } else {
+            // 429 is self-inflicted throttling rather than a real failure.
+            render(
+              res.status === 429 ? 'warn' : 'err',
+              data.message || 'Send failed',
+              { code: data.code },
+              data.note
+            );
+          }
+        } catch (err) {
+          render('err', 'Could not reach the server', {}, err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = label;
+        }
+      });
+    </script>
+  </body>
+</html>
